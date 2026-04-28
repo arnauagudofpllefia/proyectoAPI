@@ -48,6 +48,11 @@ function ProductForm({ editingProduct, onCancel, onSubmit, saving }) {
       return
     }
 
+    if (!editingProduct && !formData.imageFile) {
+      setError('La API exige una imagen al crear el producto.')
+      return
+    }
+
     await onSubmit({
       ...formData,
       name: formData.name.trim(),
@@ -170,7 +175,7 @@ function ProductForm({ editingProduct, onCancel, onSubmit, saving }) {
         </label>
 
         <label className="label" htmlFor="imageFile">
-          Imagen del producto
+          Imagen del producto {editingProduct ? '(opcional)' : '(obligatoria)'}
           <input
             className="input"
             id="imageFile"

@@ -125,9 +125,12 @@ export function AuthProvider({ children }) {
       setLoading(true)
 
       try {
-        const user = await apiUpdateProfile(auth.token, profile)
-        setAuth((current) => ({ ...current, user }))
-        return user
+        const result = await apiUpdateProfile(auth.token, profile)
+        setAuth((current) => ({
+          token: result.token || current.token,
+          user: result.user,
+        }))
+        return result.user
       } finally {
         setLoading(false)
       }

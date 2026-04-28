@@ -21,6 +21,22 @@ function Login({ onSwitchToRegister }) {
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
 
+  const resolveLoginError = (submitError) => {
+    if (submitError?.status === 401) {
+      return 'Correo o contraseña incorrectos.'
+    }
+
+    if (submitError?.status === 404) {
+      return 'No se encontró el endpoint de login. Asegúrate de usar el frontend en Vite dev (proxy) o una API accesible.'
+    }
+
+    if (submitError?.status === 0) {
+      return 'No se pudo conectar con la API. Comprueba conexión, CORS o proxy de Vite.'
+    }
+
+    return submitError?.message || 'No se pudo iniciar sesión.'
+  }
+
   const handleChange = ({ target }) => {
     const { name, value } = target
     setFormData((current) => ({ ...current, [name]: value }))
@@ -43,7 +59,7 @@ function Login({ onSwitchToRegister }) {
 
       navigate(location.state?.from || resolveRouteByRole(result.user?.role), { replace: true })
     } catch (submitError) {
-      setError(submitError.message)
+      setError(resolveLoginError(submitError))
     }
   }
 

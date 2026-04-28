@@ -1,4 +1,4 @@
-const RAW_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const RAW_API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
 export const API_BASE_URL = RAW_API_BASE_URL.replace(/\/$/, '')
 export const isApiConfigured = Boolean(import.meta.env.VITE_API_URL)
@@ -12,7 +12,7 @@ const endpointGroups = {
   profile: ['/api/auth/perfil', '/api/auth/profile'],
   orders: ['/api/comandes', '/api/pedidos', '/api/orders'],
   myOrders: ['/api/comandes/me', '/api/pedidos/me', '/api/orders/me'],
-  users: ['/api/usuaris', '/api/usuarios', '/api/users'],
+  users: ['/api/auth/usuaris', '/api/usuaris', '/api/usuarios', '/api/users'],
 }
 
 function createHttpError(message, status, body) {
@@ -41,7 +41,15 @@ function normalizeRole(role = 'user') {
     return 'editor'
   }
 
+  if (normalized.includes('usuari') || normalized.includes('user')) {
+    return 'user'
+  }
+
   return 'user'
+}
+
+function mapRoleToApi(role = 'user') {
+  return role === 'user' ? 'usuari' : role
 }
 
 function resolveArray(payload, keys = []) {
@@ -62,7 +70,7 @@ function resolveArray(payload, keys = []) {
   return []
 }
 
-async function parseResponse(response) {
+async function parseResponse(response, path = '') {
   const contentType = response.headers.get('content-type') || ''
   let payload = null
 
@@ -79,8 +87,12 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    const message =
-      payload?.message || payload?.msg || payload?.error || `Error HTTP ${response.status}`
+    const rawMessage = payload?.message || payload?.msg || payload?.error || ''
+    const notFoundHint =
+      response.status === 404
+        ? `Endpoint no encontrado (${path || 'ruta desconocida'}). Revisa que el frontend esté en Vite dev o que la API/proxy esté activa.`
+        : ''
+    const message = rawMessage || notFoundHint || `Error HTTP ${response.status}`
 
     throw createHttpError(message, response.status, payload)
   }
@@ -99,12 +111,22 @@ async function request(path, options = {}, token) {
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  })
+  let response
 
-  return parseResponse(response)
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    })
+  } catch (error) {
+    throw createHttpError(
+      'No se pudo conectar con la API. Si usas Render desde local, arranca Vite para usar el proxy o revisa CORS.',
+      0,
+      error,
+    )
+  }
+
+  return parseResponse(response, path)
 }
 
 async function requestWithFallback(paths, buildOptions, token) {
@@ -160,26 +182,28 @@ export function normalizeProduct(raw = {}, forcedCategory = '') {
     abv: String(pickFirst(raw.graduacion, raw.abv, raw.alcohol, '0')),
     price: Number(pickFirst(raw.precio, raw.price, raw.pvp, 0)),
     stock: Number(pickFirst(raw.stock, raw.cantidad, raw.units, 0)),
-    image: resolveAssetUrl(pickFirst(raw.imagen, raw.image, raw.foto, raw.imageUrl, '')),
+    image: resolveAssetUrl(pickFirst(raw.imatge, raw.imagen, raw.image, raw.foto, raw.imageUrl, '')),
   }
 }
 
 export function normalizeUser(raw = {}) {
+  const email = pickFirst(raw.email, raw.correo, 'sin-correo@example.com')
+
   return {
     id: pickFirst(raw._id, raw.id, raw.uid, crypto.randomUUID()),
-    name: pickFirst(raw.nombre, raw.name, raw.username, 'Usuario'),
-    email: pickFirst(raw.email, raw.correo, 'sin-correo@example.com'),
+    name: pickFirst(raw.nombre, raw.name, raw.username, email.split('@')[0] || 'Usuario'),
+    email,
     role: normalizeRole(pickFirst(raw.rol, raw.role, 'user')),
-    image: resolveAssetUrl(pickFirst(raw.foto, raw.image, raw.avatar, '')),
+    image: resolveAssetUrl(pickFirst(raw.imatge, raw.foto, raw.image, raw.avatar, '')),
   }
 }
 
 function normalizeOrderItem(raw = {}) {
   return {
-    id: pickFirst(raw._id, raw.id, crypto.randomUUID()),
-    name: pickFirst(raw.nombre, raw.name, raw.productName, 'Producto'),
-    quantity: Number(pickFirst(raw.cantidad, raw.quantity, 1)),
-    price: Number(pickFirst(raw.precio, raw.price, 0)),
+    id: pickFirst(raw._id, raw.id, raw.producteId, crypto.randomUUID()),
+    name: pickFirst(raw.nom, raw.nombre, raw.name, raw.productName, 'Producto'),
+    quantity: Number(pickFirst(raw.quantitat, raw.cantidad, raw.quantity, 1)),
+    price: Number(pickFirst(raw.preuUnitari, raw.precio, raw.price, 0)),
   }
 }
 
@@ -197,39 +221,68 @@ export function normalizeOrder(raw = {}) {
 }
 
 function extractAuthPayload(payload = {}) {
-  const user = normalizeUser(payload.user || payload.usuario || payload.profile || payload.data || {})
+  const user = normalizeUser(
+    payload.user || payload.usuario || payload.usuari || payload.profile || payload.data || {},
+  )
   const token = pickFirst(payload.token, payload.jwt, payload.accessToken, '')
 
   return { token, user }
 }
 
-function buildProductPayload(product) {
-  const baseFields = {
+function buildProductFields(product) {
+  return {
     nombre: product.name,
     descripcion: product.description,
     tipo: product.type,
     graduacion: product.abv,
     precio: Number(product.price || 0),
-    stock: Number(product.stock || 0),
-    categoria: product.category,
-    category: product.category,
-    tipoProducto: product.category,
   }
+}
+
+function buildProductCreatePayload(product) {
+  const formData = new FormData()
+  const baseFields = buildProductFields(product)
+
+  Object.entries(baseFields).forEach(([key, value]) => {
+    formData.append(key, String(value ?? ''))
+  })
 
   if (product.imageFile) {
-    const formData = new FormData()
-
-    Object.entries(baseFields).forEach(([key, value]) => {
-      formData.append(key, String(value ?? ''))
-    })
-
-    formData.append('image', product.imageFile)
-    formData.append('imagen', product.imageFile)
-    formData.append('foto', product.imageFile)
-    return formData
+    formData.append('imatge', product.imageFile)
   }
 
-  return JSON.stringify(baseFields)
+  return formData
+}
+
+function buildProductUpdatePayload(product) {
+  return JSON.stringify(buildProductFields(product))
+}
+
+function buildProductImagePayload(product) {
+  const formData = new FormData()
+  formData.append('imatge', product.imageFile)
+  return formData
+}
+
+function extractProductEntity(payload = {}) {
+  const entity =
+    payload?.vino ??
+    payload?.cerveza ??
+    payload?.producte ??
+    payload?.producto ??
+    payload?.product ??
+    payload?.data ??
+    null
+
+  if (entity && typeof entity === 'object') {
+    return entity
+  }
+
+  if (payload && typeof payload === 'object' && (payload._id || payload.id || payload.nombre || payload.name)) {
+    return payload
+  }
+
+  return null
 }
 
 export async function login(credentials) {
@@ -250,6 +303,7 @@ export async function register(data) {
   formData.append('password', data.password)
 
   if (data.photo) {
+    formData.append('imatge', data.photo)
     formData.append('foto', data.photo)
     formData.append('image', data.photo)
   }
@@ -264,7 +318,7 @@ export async function register(data) {
 
 export async function getProfile(token) {
   const payload = await requestWithFallback(endpointGroups.profile, () => ({ method: 'GET' }), token)
-  return normalizeUser(payload.user || payload.usuario || payload.profile || payload.data || payload)
+  return normalizeUser(payload.user || payload.usuario || payload.usuari || payload.profile || payload.data || payload)
 }
 
 export async function updateProfile(token, profile) {
@@ -274,54 +328,53 @@ export async function updateProfile(token, profile) {
     token,
   )
 
-  return normalizeUser(payload.user || payload.usuario || payload.profile || payload.data || payload)
+  return extractAuthPayload(payload)
 }
 
-export async function getProducts() {
-  try {
-    const payload = await requestWithFallback(endpointGroups.products, () => ({ method: 'GET' }))
-    const products = resolveArray(payload, ['productes', 'productos', 'products'])
-    return products.map((item) => normalizeProduct(item))
-  } catch {
-    const [winesResult, beersResult] = await Promise.allSettled([
-      requestWithFallback(endpointGroups.wines, () => ({ method: 'GET' })),
-      requestWithFallback(endpointGroups.beers, () => ({ method: 'GET' })),
-    ])
+export async function getProducts(token) {
+  const [winesResult, beersResult] = await Promise.allSettled([
+    requestWithFallback(endpointGroups.wines, () => ({ method: 'GET' }), token),
+    requestWithFallback(endpointGroups.beers, () => ({ method: 'GET' }), token),
+  ])
 
-    const wines = winesResult.status === 'fulfilled'
+  const wines =
+    winesResult.status === 'fulfilled'
       ? resolveArray(winesResult.value, ['vins', 'vinos', 'wines']).map((item) => normalizeProduct(item, 'vino'))
       : []
 
-    const beers = beersResult.status === 'fulfilled'
+  const beers =
+    beersResult.status === 'fulfilled'
       ? resolveArray(beersResult.value, ['cerveses', 'cervezas', 'beers']).map((item) => normalizeProduct(item, 'cerveza'))
       : []
 
-    if (!wines.length && !beers.length) {
-      throw new Error('No se ha podido cargar el catálogo desde la API.')
-    }
-
-    return [...wines, ...beers]
+  if (!wines.length && !beers.length) {
+    const error = winesResult.status === 'rejected' ? winesResult.reason : beersResult.reason
+    throw error || new Error('No se ha podido cargar el catálogo desde la API.')
   }
+
+  return [...wines, ...beers]
 }
 
-export async function getProductById(id) {
-  const paths = [
-    ...endpointGroups.products.map((path) => `${path}/${id}`),
-    ...endpointGroups.wines.map((path) => `${path}/${id}`),
-    ...endpointGroups.beers.map((path) => `${path}/${id}`),
-  ]
+export async function getProductById(id, token) {
+  const paths = [...endpointGroups.wines, ...endpointGroups.beers].map((path) => `${path}/${id}`)
 
-  const payload = await requestWithFallback(paths, () => ({ method: 'GET' }))
+  const payload = await requestWithFallback(paths, () => ({ method: 'GET' }), token)
 
   return normalizeProduct(
-    payload.producte || payload.producto || payload.product || payload.data || payload,
+    payload.vino || payload.cerveza || payload.producte || payload.producto || payload.product || payload.data || payload,
   )
 }
 
 export async function createOrder(token, order) {
+  const items = (order.items || []).map((item) => ({
+    tipus: item.tipus || item.category || item.tipo,
+    producteId: item.producteId || item.productId,
+    quantitat: Number(item.quantitat || item.cantidad || item.quantity || 1),
+  }))
+
   const payload = await requestWithFallback(
     endpointGroups.orders,
-    () => ({ method: 'POST', body: JSON.stringify(order) }),
+    () => ({ method: 'POST', body: JSON.stringify({ items }) }),
     token,
   )
 
@@ -335,33 +388,111 @@ export async function getMyOrders(token) {
 }
 
 export async function saveProduct(token, product, productId = '') {
-  const preferredPaths = product.category === 'cerveza' ? endpointGroups.beers : endpointGroups.wines
-  const paths = [
-    ...endpointGroups.products,
-    ...preferredPaths,
-  ].map((path) => (productId ? `${path}/${productId}` : path))
+  const primaryPaths = product.category === 'cerveza' ? endpointGroups.beers : endpointGroups.wines
+  const secondaryPaths = product.category === 'cerveza' ? endpointGroups.wines : endpointGroups.beers
 
-  const payload = await requestWithFallback(
-    paths,
-    () => ({ method: productId ? 'PUT' : 'POST', body: buildProductPayload(product) }),
-    token,
-  )
+  if (!productId) {
+    const payload = await requestWithFallback(
+      primaryPaths,
+      () => ({ method: 'POST', body: buildProductCreatePayload(product) }),
+      token,
+    )
 
-  return normalizeProduct(
-    payload.producte || payload.producto || payload.product || payload.data || payload,
-    product.category,
-  )
+    const createdEntity = extractProductEntity(payload)
+
+    return normalizeProduct(createdEntity || payload, product.category)
+  }
+
+  const updatePaths = [...primaryPaths, ...secondaryPaths].map((path) => `${path}/${productId}`)
+  let payload = null
+  let normalizedProduct = null
+  let resolvedPath = ''
+  let lastError = null
+
+  for (const path of updatePaths) {
+    try {
+      const responsePayload = await request(
+        path,
+        { method: 'PUT', body: buildProductUpdatePayload(product) },
+        token,
+      )
+
+      const entity = extractProductEntity(responsePayload)
+
+      if (!entity) {
+        lastError = createHttpError('Producto no encontrado.', 404, responsePayload)
+        continue
+      }
+
+      payload = responsePayload
+      resolvedPath = path
+      normalizedProduct = normalizeProduct(entity, product.category)
+      break
+    } catch (error) {
+      lastError = error
+
+      if (![404, 405].includes(error.status ?? 0)) {
+        throw error
+      }
+    }
+  }
+
+  if (!normalizedProduct) {
+    throw lastError || new Error('No se pudo actualizar el producto en la API.')
+  }
+
+  if (product.imageFile) {
+    const imagePaths = [
+      `${resolvedPath}/imatge`,
+      ...updatePaths.map((path) => `${path}/imatge`),
+    ]
+
+    const uniqueImagePaths = [...new Set(imagePaths)]
+    let imagePayload = null
+
+    for (const path of uniqueImagePaths) {
+      try {
+        const responsePayload = await request(
+          path,
+          { method: 'PATCH', body: buildProductImagePayload(product) },
+          token,
+        )
+
+        const entity = extractProductEntity(responsePayload)
+
+        if (!entity) {
+          continue
+        }
+
+        imagePayload = responsePayload
+        break
+      } catch (error) {
+        if (![404, 405].includes(error.status ?? 0)) {
+          throw error
+        }
+      }
+    }
+
+    if (imagePayload) {
+      normalizedProduct = normalizeProduct(
+        extractProductEntity(imagePayload) || imagePayload,
+        product.category,
+      )
+    }
+  }
+
+  return normalizedProduct
 }
 
 export async function deleteProduct(token, product) {
-  const preferredPaths = product.category === 'cerveza' ? endpointGroups.beers : endpointGroups.wines
   const productId = product.id || product._id
-  const paths = [
-    ...endpointGroups.products,
-    ...preferredPaths,
-  ].map((path) => `${path}/${productId}`)
+  const pathsByCategory = product.category === 'cerveza' ? endpointGroups.beers : endpointGroups.wines
 
-  return requestWithFallback(paths, () => ({ method: 'DELETE' }), token)
+  return requestWithFallback(
+    pathsByCategory.map((path) => `${path}/${productId}`),
+    () => ({ method: 'DELETE' }),
+    token,
+  )
 }
 
 export async function getUsers(token) {
@@ -372,12 +503,11 @@ export async function getUsers(token) {
 
 export async function updateUserRole(token, userId, role) {
   const patchPaths = endpointGroups.users.map((path) => `${path}/${userId}/rol`)
-  const alternativePaths = endpointGroups.users.map((path) => `/${path.split('/').filter(Boolean).join('/')}/${userId}/role`)
   const payload = await requestWithFallback(
-    [...patchPaths, ...alternativePaths],
-    () => ({ method: 'PATCH', body: JSON.stringify({ rol: role, role }) }),
+    patchPaths,
+    () => ({ method: 'PATCH', body: JSON.stringify({ rol: mapRoleToApi(role) }) }),
     token,
   )
 
-  return normalizeUser(payload.user || payload.usuario || payload.data || payload)
+  return normalizeUser(payload.user || payload.usuario || payload.usuari || payload.data || payload)
 }

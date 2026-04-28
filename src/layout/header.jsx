@@ -18,17 +18,15 @@ function Header() {
 
       <div className="relative z-10 flex h-full flex-col gap-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.42em] text-amber-200/90">IA3 · Vinacoteca</p>
-          <h2 className="mt-4 max-w-xl text-4xl leading-tight md:text-5xl">
-            Frontend preparado para catálogo, auth, pedidos y dashboards por rol.
-          </h2>
-          <p className="mt-4 max-w-xl text-sm leading-7 text-stone-200/85 md:text-base">
-            Diseñado para conectarse a tu API Express + MongoDB Atlas en cuanto cierres endpoints, JWT y CORS.
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.42em] text-amber-200/90">Vinacoteca</p>
+          <h2 className="mt-4 max-w-xl text-4xl leading-tight md:text-5xl">Gestión simple de catálogo y pedidos</h2>
         </div>
 
         <nav className="flex flex-wrap gap-2">
           <NavLink className={getLinkClassName} to="/">
+            Inicio
+          </NavLink>
+          <NavLink className={getLinkClassName} to="/catalogo">
             Catálogo
           </NavLink>
           <NavLink className={getLinkClassName} to="/pedidos">
@@ -51,26 +49,11 @@ function Header() {
               ) : null}
             </>
           ) : (
-            <NavLink className={getLinkClassName} to="/auth">
-              Login / registro
+            <NavLink className={getLinkClassName} to="/login">
+              Login
             </NavLink>
           )}
         </nav>
-
-        <div className="grid gap-4 text-sm text-stone-200/85 md:grid-cols-3">
-          <article className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">JWT</p>
-            <p className="mt-3 leading-6">Sesión persistente y rutas protegidas por rol.</p>
-          </article>
-          <article className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">CRUD</p>
-            <p className="mt-3 leading-6">Editor y admin con paneles listos para vinos y cervezas.</p>
-          </article>
-          <article className="rounded-[1.4rem] border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">Uploads</p>
-            <p className="mt-3 leading-6">Registro con foto preparado para Multer y `/uploads`.</p>
-          </article>
-        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-[rgba(255,255,255,0.06)] px-4 py-3 text-sm">
           {isAuthenticated ? (
@@ -84,8 +67,8 @@ function Header() {
             </>
           ) : (
             <>
-              <p>Accede para probar la zona privada y los dashboards.</p>
-              <Link className="btn-secondary border-white/15 text-white hover:bg-white/10" to="/auth">
+              <p>Inicia sesión para acceder a pedidos y paneles.</p>
+              <Link className="btn-secondary border-white/15 text-white hover:bg-white/10" to="/login">
                 Ir al acceso
               </Link>
             </>

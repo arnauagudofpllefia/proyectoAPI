@@ -4,13 +4,13 @@
 
 @layer base {
   :root {
-    --paper: #f7efe3;
-    --paper-deep: #eadcc8;
-    --ink: #2f2017;
-    --muted: #766557;
-    --accent: #a9753b;
-    --wood-dark: #5b3d28;
-    --line: rgba(98, 67, 42, 0.18);
+    --paper: #f6f0e6;
+    --paper-deep: #eadfce;
+    --ink: #271b16;
+    --muted: #64584f;
+    --accent: #9d6a34;
+    --wood-dark: #4f3827;
+    --line: rgba(88, 61, 40, 0.18);
   }
 
   * {
@@ -18,8 +18,8 @@
   }
 
   html {
-    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
-    background: #efe2cf;
+    font-family: 'Garamond', 'Book Antiqua', 'Palatino Linotype', serif;
+    background: #efe4d3;
     color-scheme: light;
   }
 
@@ -29,15 +29,15 @@
     min-height: 100vh;
     color: var(--ink);
     background:
-      linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18)),
-      repeating-linear-gradient(
-        90deg,
-        rgba(111, 76, 48, 0.06) 0,
-        rgba(111, 76, 48, 0.06) 2px,
+      radial-gradient(circle at 18% -8%, rgba(199, 150, 95, 0.26), transparent 34%),
+      radial-gradient(circle at 100% 10%, rgba(125, 90, 62, 0.12), transparent 38%),
+      linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.14)),
+      repeating-linear-gradient(90deg,
+        rgba(111, 76, 48, 0.04) 0,
+        rgba(111, 76, 48, 0.04) 2px,
         transparent 2px,
-        transparent 18px
-      ),
-      linear-gradient(180deg, #e8d8c0 0%, #f5ecde 45%, #ece0cf 100%);
+        transparent 22px),
+      linear-gradient(180deg, #eadbc5 0%, #f8efe3 46%, #eee2d2 100%);
   }
 
   a {
@@ -55,8 +55,8 @@
   h1,
   h2,
   h3 {
-    font-family: Georgia, 'Times New Roman', serif;
-    letter-spacing: 0.01em;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    letter-spacing: 0.005em;
   }
 
   #root {
@@ -66,7 +66,10 @@
 
 @layer components {
   .panel {
-    @apply rounded-[1.4rem] border border-[rgba(109,78,52,0.16)] bg-[rgba(255,251,245,0.86)] p-5 shadow-[0_14px_30px_rgba(73,48,29,0.08)] backdrop-blur;
+    @apply rounded-[1.2rem] border p-5 backdrop-blur;
+    border-color: rgba(96, 68, 46, 0.15);
+    background: rgba(255, 251, 246, 0.88);
+    box-shadow: 0 10px 24px rgba(62, 40, 25, 0.09);
   }
 
   .label {
@@ -74,30 +77,49 @@
   }
 
   .input {
-    @apply mt-2 w-full rounded-[1.1rem] border border-[rgba(120,85,56,0.22)] bg-[rgba(255,250,242,0.9)] px-4 py-3 text-[--ink] outline-none transition placeholder:text-[color:var(--muted)] focus:border-[--accent] focus:ring-2 focus:ring-[rgba(169,117,59,0.18)];
+    @apply mt-2 w-full rounded-[0.95rem] border px-4 py-3 text-[--ink] outline-none transition placeholder:text-[color:var(--muted)] focus:border-[--accent] focus:ring-2;
+    border-color: rgba(116, 84, 58, 0.2);
+    background: rgba(255, 252, 246, 0.92);
+    --tw-ring-color: rgba(157, 106, 52, 0.16);
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-[1.05rem] bg-[linear-gradient(180deg,#7d5737,#5d3c26)] px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-[--paper] transition hover:brightness-105;
+    @apply inline-flex items-center justify-center rounded-[0.95rem] px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-[--paper] transition hover:brightness-105;
+    background: linear-gradient(180deg, #7b512f, #5a3a24);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-[1.05rem] border border-[rgba(109,78,52,0.18)] bg-[rgba(255,255,255,0.42)] px-4 py-3 text-sm font-semibold text-[--wood-dark] transition hover:bg-[rgba(255,255,255,0.62)];
+    @apply inline-flex items-center justify-center rounded-[0.95rem] border px-4 py-3 text-sm font-semibold text-[--wood-dark] transition;
+    border-color: rgba(109, 78, 52, 0.18);
+    background: rgba(255, 255, 255, 0.52);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.72);
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-[1.05rem] border border-red-200 bg-[rgba(126,31,17,0.08)] px-4 py-3 text-sm font-semibold text-red-800 transition hover:bg-[rgba(126,31,17,0.14)];
+    @apply inline-flex items-center justify-center rounded-[1.05rem] border border-red-200 px-4 py-3 text-sm font-semibold text-red-800 transition;
+    background: rgba(126, 31, 17, 0.08);
+  }
+
+  .btn-danger:hover {
+    background: rgba(126, 31, 17, 0.14);
   }
 
   .status-note {
-    @apply rounded-[1.05rem] border border-[rgba(169,117,59,0.18)] bg-[rgba(255,248,238,0.86)] px-4 py-3 text-sm text-[--wood-dark];
+    @apply rounded-[0.95rem] border px-4 py-3 text-sm text-[--wood-dark];
+    border-color: rgba(169, 117, 59, 0.18);
+    background: rgba(255, 248, 238, 0.88);
   }
 
   .status-note--error {
-    @apply border-red-200 bg-[rgba(126,31,17,0.08)] text-red-800;
+    @apply border-red-200 text-red-800;
+    background: rgba(126, 31, 17, 0.08);
   }
 
   .status-note--success {
-    @apply border-emerald-200 bg-[rgba(79,102,74,0.1)] text-emerald-900;
+    @apply border-emerald-200 text-emerald-900;
+    background: rgba(79, 102, 74, 0.1);
   }
 }

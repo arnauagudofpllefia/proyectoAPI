@@ -15,6 +15,28 @@ function Register({ onSwitchToLogin }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
+  const resolveRegisterError = (submitError) => {
+    const raw = String(submitError?.message || '').toLowerCase()
+
+    if (submitError?.status === 404) {
+      return 'No se encontró el endpoint de registro. Asegúrate de usar el frontend en Vite dev (proxy) o una API accesible.'
+    }
+
+    if (submitError?.status === 0) {
+      return 'No se pudo conectar con la API. Comprueba conexión, CORS o proxy de Vite.'
+    }
+
+    if (raw.includes('imatge') || raw.includes('imagen') || raw.includes('obligatoria')) {
+      return 'La imagen de perfil es obligatoria para registrarte.'
+    }
+
+    if (raw.includes('registrat') || raw.includes('registrado') || raw.includes('ja està')) {
+      return 'Ese correo ya está registrado.'
+    }
+
+    return submitError?.message || 'No se pudo completar el registro.'
+  }
+
   const handleChange = ({ target }) => {
     const { files, name, value } = target
 
@@ -71,7 +93,7 @@ function Register({ onSwitchToLogin }) {
       setFormData(initialForm)
       onSwitchToLogin()
     } catch (submitError) {
-      setError(submitError.message)
+      setError(resolveRegisterError(submitError))
     }
   }
 
@@ -81,7 +103,7 @@ function Register({ onSwitchToLogin }) {
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[--accent]">Vinacoteca</p>
         <h2 className="mt-3 text-3xl leading-tight text-[--ink]">Crear cuenta</h2>
         <p className="mt-2 text-sm leading-6 text-[--muted]">
-          El alta ya está preparada para enviar nombre, email, contraseña y foto usando `multipart/form-data`.
+          El alta envía email, contraseña e imagen mediante `multipart/form-data` para conectar con tu API.
         </p>
       </div>
 
@@ -147,6 +169,10 @@ function Register({ onSwitchToLogin }) {
 
         {error ? <p className="status-note status-note--error">{error}</p> : null}
         {message ? <p className="status-note status-note--success">{message}</p> : null}
+
+        <p className="text-xs leading-5 text-[--muted]">
+          Tu backend no guarda el nombre en el registro actual; el frontend usará el email como identificador visible si hace falta.
+        </p>
 
         <button className="btn-primary w-full" disabled={loading} type="submit">
           {loading ? 'Creando cuenta...' : 'Crear cuenta'}

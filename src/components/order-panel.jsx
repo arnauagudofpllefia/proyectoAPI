@@ -48,23 +48,21 @@ function OrderPanel({ products, orders, initialProductId = '', previewMode, onOr
 
     const payload = {
       productId: selectedProduct.id,
+      producteId: selectedProduct.id,
+      category: selectedProduct.category,
       quantity: formData.quantity,
+      quantitat: formData.quantity,
       notes: formData.notes.trim(),
       total: selectedProduct.price * formData.quantity,
       items: [
         {
+          tipus: selectedProduct.category,
+          producteId: selectedProduct.id,
           productId: selectedProduct.id,
           name: selectedProduct.name,
+          quantitat: formData.quantity,
           quantity: formData.quantity,
           price: selectedProduct.price,
-        },
-      ],
-      productos: [
-        {
-          productId: selectedProduct.id,
-          name: selectedProduct.name,
-          cantidad: formData.quantity,
-          precio: selectedProduct.price,
         },
       ],
     }
@@ -83,7 +81,14 @@ function OrderPanel({ products, orders, initialProductId = '', previewMode, onOr
           createdAt: new Date().toISOString(),
           status: 'pendiente',
           total: payload.total,
-          items: payload.items,
+          items: [
+            {
+              id: selectedProduct.id,
+              name: selectedProduct.name,
+              quantity: formData.quantity,
+              price: selectedProduct.price,
+            },
+          ],
           notes: payload.notes,
         })
 

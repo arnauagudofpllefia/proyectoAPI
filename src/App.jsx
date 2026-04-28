@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Link, Route, Routes, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Login from './components/login'
 import OrderPanel from './components/order-panel'
 import ProductCard from './components/product-card'
@@ -38,7 +38,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route element={<HomePage />} path="/" />
-      <Route element={<AuthPage />} path="/auth" />
+      <Route element={<CatalogPage />} path="/catalogo" />
+      <Route element={<Navigate to="/login" replace />} path="/auth" />
+      <Route element={<LoginPage />} path="/login" />
+      <Route element={<RegisterPage />} path="/registro" />
       <Route element={<ProductDetailPage />} path="/producto/:id" />
       <Route
         element={
@@ -114,6 +117,45 @@ function Notice({ tone = 'info', children }) {
 
 function HomePage() {
   const { isAuthenticated, user } = useAuth()
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        badge="Vinacoteca"
+        title="Compra y gestiona tu catálogo"
+        description="Interfaz simple para clientes, editores y administradores."
+        actions={
+          <>
+            <Link className="btn-primary" to="/catalogo">
+              Ver catálogo
+            </Link>
+            <Link className="btn-secondary" to={isAuthenticated ? resolveLandingRoute(user?.role) : '/login'}>
+              {isAuthenticated ? 'Mi panel' : 'Iniciar sesión'}
+            </Link>
+          </>
+        }
+      />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <article className="panel">
+          <h2 className="text-xl text-[--ink]">Catálogo</h2>
+          <p className="mt-2 text-sm text-[--muted]">Consulta vinos y cervezas en una vista dedicada.</p>
+        </article>
+        <article className="panel">
+          <h2 className="text-xl text-[--ink]">Pedidos</h2>
+          <p className="mt-2 text-sm text-[--muted]">Crea pedidos y revisa historial con tu cuenta.</p>
+        </article>
+        <article className="panel">
+          <h2 className="text-xl text-[--ink]">Gestión</h2>
+          <p className="mt-2 text-sm text-[--muted]">Paneles separados para editor y admin.</p>
+        </article>
+      </section>
+    </div>
+  )
+}
+
+function CatalogPage() {
+  const { isAuthenticated, token, user } = useAuth()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [previewMode, setPreviewMode] = useState(false)
@@ -123,7 +165,7 @@ function HomePage() {
   useEffect(() => {
     let ignore = false
 
-    getProducts()
+    getProducts(token)
       .then((catalog) => {
         if (!ignore) {
           setProducts(catalog)
@@ -135,7 +177,11 @@ function HomePage() {
         if (!ignore) {
           setProducts(demoProducts)
           setPreviewMode(true)
-          setErrorMessage(error.message)
+          setErrorMessage(
+            error.status === 401
+              ? 'Tu API requiere login para listar vinos y cervezas.'
+              : error.message,
+          )
         }
       })
       .finally(() => {
@@ -147,7 +193,7 @@ function HomePage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [token])
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -163,51 +209,29 @@ function HomePage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        badge="Frontend React listo"
-        title="Catálogo público + zonas privadas por rol"
-        description="La interfaz ya queda preparada para catálogo, registro con foto, login JWT, pedidos, dashboard editor y dashboard admin. Solo tendrás que apuntarla a tu backend con `VITE_API_URL`."
+        badge="Catálogo"
+        title="Vinos y cervezas"
+        description="Busca y filtra productos disponibles."
         actions={
           <>
-            <Link className="btn-primary" to={isAuthenticated ? resolveLandingRoute(user?.role) : '/auth'}>
-              {isAuthenticated ? 'Ir a mi zona' : 'Entrar / registrarse'}
+            <Link className="btn-primary" to={isAuthenticated ? resolveLandingRoute(user?.role) : '/login'}>
+              {isAuthenticated ? 'Mi zona' : 'Entrar'}
             </Link>
             <Link className="btn-secondary" to="/pedidos">
-              Probar flujo de pedido
+              Ir a pedidos
             </Link>
           </>
         }
       />
 
-      {!isApiConfigured ? (
-        <Notice>
-          No has definido `VITE_API_URL`; por ahora el frontend intentará usar `http://localhost:3000`.
-        </Notice>
-      ) : null}
-
       {previewMode ? (
         <Notice tone="info">
-          No se pudo contactar con la API y se muestran productos de vista previa. Cuando tu backend esté listo, el catálogo consumirá datos reales desde `{API_BASE_URL}`.
+          {isAuthenticated
+            ? `No se pudo cargar el catálogo real desde ${API_BASE_URL} y se muestran productos de vista previa.`
+            : 'Sin sesión no se puede cargar el catálogo real porque tu API protege esos endpoints con JWT.'}
           {errorMessage ? ` Motivo: ${errorMessage}` : ''}
         </Notice>
       ) : null}
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="panel">
-          <p className="text-xs uppercase tracking-[0.25em] text-[--accent]">Público</p>
-          <h2 className="mt-2 text-xl text-[--ink]">Catálogo y detalle</h2>
-          <p className="mt-2 text-sm text-[--muted]">Listados listos para `/api/productes`, `/api/productos`, `/api/vinos` y `/api/cervezas`.</p>
-        </article>
-        <article className="panel">
-          <p className="text-xs uppercase tracking-[0.25em] text-[--accent]">Usuario</p>
-          <h2 className="mt-2 text-xl text-[--ink]">Registro, login y pedidos</h2>
-          <p className="mt-2 text-sm text-[--muted]">Persistencia de sesión, rutas protegidas y formulario de pedido preparado para JWT.</p>
-        </article>
-        <article className="panel">
-          <p className="text-xs uppercase tracking-[0.25em] text-[--accent]">Editor/Admin</p>
-          <h2 className="mt-2 text-xl text-[--ink]">Dashboards operativos</h2>
-          <p className="mt-2 text-sm text-[--muted]">CRUD de productos y gestión de usuarios/roles listos para conectar con los endpoints protegidos.</p>
-        </article>
-      </section>
 
       <section className="panel space-y-4">
         <div className="grid gap-4 md:grid-cols-[1fr_180px] lg:grid-cols-[1fr_180px_180px]">
@@ -256,10 +280,9 @@ function HomePage() {
   )
 }
 
-function AuthPage() {
+function AuthPage({ mode = 'login' }) {
+  const navigate = useNavigate()
   const { isAuthenticated, user } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const mode = searchParams.get('mode') === 'register' ? 'register' : 'login'
 
   if (isAuthenticated) {
     return (
@@ -267,7 +290,7 @@ function AuthPage() {
         <PageHeader
           badge="Sesión activa"
           title={`Ya has iniciado sesión como ${user?.name || user?.email}`}
-          description="Tu token ya está guardado en el navegador y las rutas privadas quedan accesibles según tu rol."
+          description=""
           actions={<Link className="btn-primary" to={resolveLandingRoute(user?.role)}>Ir a mi panel</Link>}
         />
       </div>
@@ -277,53 +300,41 @@ function AuthPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        badge="Autenticación JWT"
-        title="Acceso y registro con foto"
-        description="El formulario de alta envía `multipart/form-data` para que puedas conectar Multer y guardar la imagen de perfil en el backend."
+        badge="Acceso"
+        title={mode === 'register' ? 'Crear cuenta' : 'Iniciar sesión'}
+        description=""
       />
 
-      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <aside className="panel space-y-4">
-          <h2 className="text-2xl text-[--ink]">Qué queda resuelto</h2>
-          <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-[--muted]">
-            <li>Persistencia de token JWT en `localStorage`.</li>
-            <li>Redirección automática si la ruta requiere login o un rol concreto.</li>
-            <li>Registro con foto preparado para `POST /api/auth/registro`.</li>
-            <li>Manejo visible de estados `401`, `403` y fallos de red.</li>
-          </ul>
-
-          <div className="rounded-[1.2rem] bg-[rgba(255,255,255,0.42)] p-4 text-sm text-[--wood-dark]">
-            <p className="font-semibold">Consejo de integración</p>
-            <p className="mt-2">
-              Si en IA2 mantuviste rutas como `/api/auth/registro` o `/api/usuarios`, este frontend ya contempla esas variantes.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <button className={mode === 'login' ? 'btn-primary' : 'btn-secondary'} onClick={() => setSearchParams({})} type="button">
-              Login
-            </button>
-            <button
-              className={mode === 'register' ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setSearchParams({ mode: 'register' })}
-              type="button"
-            >
-              Registro
-            </button>
-          </div>
+      <div className="grid gap-5 xl:grid-cols-[220px_1fr]">
+        <aside className="panel flex flex-col gap-3">
+          <button className={mode === 'login' ? 'btn-primary' : 'btn-secondary'} onClick={() => navigate('/login')} type="button">
+            Login
+          </button>
+          <button className={mode === 'register' ? 'btn-primary' : 'btn-secondary'} onClick={() => navigate('/registro')} type="button">
+            Registro
+          </button>
         </aside>
 
         {mode === 'register' ? (
-          <Register onSwitchToLogin={() => setSearchParams({})} />
+          <Register onSwitchToLogin={() => navigate('/login')} />
         ) : (
-          <Login onSwitchToRegister={() => setSearchParams({ mode: 'register' })} />
+          <Login onSwitchToRegister={() => navigate('/registro')} />
         )}
       </div>
     </div>
   )
 }
 
+function LoginPage() {
+  return <AuthPage mode="login" />
+}
+
+function RegisterPage() {
+  return <AuthPage mode="register" />
+}
+
 function ProductDetailPage() {
+  const { token } = useAuth()
   const { id } = useParams()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -333,7 +344,7 @@ function ProductDetailPage() {
   useEffect(() => {
     let ignore = false
 
-    getProductById(id)
+    getProductById(id, token)
       .then((item) => {
         if (!ignore) {
           setProduct(item)
@@ -364,7 +375,7 @@ function ProductDetailPage() {
     return () => {
       ignore = true
     }
-  }, [id])
+  }, [id, token])
 
   if (loading) {
     return <div className="panel text-sm text-[--muted]">Cargando detalle del producto...</div>
@@ -376,8 +387,8 @@ function ProductDetailPage() {
         <PageHeader
           badge="404 controlado"
           title="Producto no encontrado"
-          description="Si el backend responde con 404, la interfaz ya muestra un estado gestionado y permite volver al catálogo."
-          actions={<Link className="btn-secondary" to="/">Volver al catálogo</Link>}
+          description=""
+          actions={<Link className="btn-secondary" to="/catalogo">Volver al catálogo</Link>}
         />
         <Notice tone="error">{errorMessage || 'No existe un producto con ese identificador.'}</Notice>
       </div>
@@ -395,7 +406,7 @@ function ProductDetailPage() {
             <Link className="btn-primary" to={`/pedidos?productId=${product.id}`}>
               Pedir este producto
             </Link>
-            <Link className="btn-secondary" to="/">
+            <Link className="btn-secondary" to="/catalogo">
               Volver al catálogo
             </Link>
           </>
@@ -410,11 +421,31 @@ function ProductDetailPage() {
       ) : null}
 
       <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="panel flex min-h-64 items-center justify-center bg-[linear-gradient(135deg,rgba(109,78,52,0.14),rgba(79,102,74,0.12))] text-center">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-[--accent]">{product.category}</p>
-            <h2 className="mt-3 text-4xl text-[--ink]">{product.type}</h2>
-            <p className="mt-3 text-sm text-[--muted]">Espacio listo para imagen servida desde `/uploads/...`.</p>
+        <div className="panel min-h-64 overflow-hidden p-0">
+          {product.image ? (
+            <img
+              alt={product.name}
+              className="h-full min-h-64 w-full object-cover"
+              src={product.image}
+              onError={(event) => {
+                event.currentTarget.style.display = 'none'
+                const fallback = event.currentTarget.nextElementSibling
+
+                if (fallback) {
+                  fallback.classList.remove('hidden')
+                }
+              }}
+            />
+          ) : null}
+
+          <div
+            className={`flex min-h-64 items-center justify-center bg-[linear-gradient(135deg,rgba(109,78,52,0.14),rgba(79,102,74,0.12))] text-center ${product.image ? 'hidden' : ''}`}
+          >
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[--accent]">{product.category}</p>
+              <h2 className="mt-3 text-4xl text-[--ink]">{product.type}</h2>
+              <p className="mt-3 text-sm text-[--muted]">Imagen no disponible</p>
+            </div>
           </div>
         </div>
 
@@ -459,7 +490,7 @@ function OrdersPage() {
   useEffect(() => {
     let ignore = false
 
-    Promise.allSettled([getProducts(), getMyOrders(token)])
+    Promise.allSettled([getProducts(token), getMyOrders(token)])
       .then(([productsResult, ordersResult]) => {
         if (ignore) {
           return
@@ -484,8 +515,8 @@ function OrdersPage() {
     <div className="space-y-5">
       <PageHeader
         badge="Comandas"
-        title="Pedido autenticado + historial"
-        description="Esta pantalla está preparada para `POST /api/comandes` y `GET /api/comandes/me`, incluyendo el flujo esperado de correo desde el backend."
+        title="Pedidos"
+        description="Crea pedidos y revisa tu historial."
       />
 
       {previewMode ? (
@@ -511,18 +542,30 @@ function OrdersPage() {
 
 function ProfilePage() {
   const { loading, saveProfile, user } = useAuth()
+  const userLabel = user?.name || user?.email || 'Usuario'
   const [formData, setFormData] = useState({
-    name: user?.name || '',
     email: user?.email || '',
+    password: '',
   })
   const [status, setStatus] = useState({ tone: 'info', message: '' })
+
+  useEffect(() => {
+    setFormData({
+      email: user?.email || '',
+      password: '',
+    })
+  }, [user?.email])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setStatus({ tone: 'info', message: '' })
 
     try {
-      await saveProfile(formData)
+      await saveProfile({
+        email: formData.email.trim(),
+        ...(formData.password.trim() ? { password: formData.password } : {}),
+      })
+      setFormData((current) => ({ ...current, password: '' }))
       setStatus({ tone: 'success', message: 'Perfil actualizado correctamente.' })
     } catch (error) {
       setStatus({ tone: 'error', message: error.message })
@@ -533,22 +576,41 @@ function ProfilePage() {
     <div className="space-y-5">
       <PageHeader
         badge="Perfil"
-        title="Sesión persistente y edición del perfil"
-        description="El token se mantiene al recargar y este formulario queda preparado para `GET/PUT /api/auth/perfil`."
+        title="Mi perfil"
+        description="Actualiza correo y contraseña."
       />
 
       <form className="panel space-y-4" onSubmit={handleSubmit}>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="label" htmlFor="profile-name">
-            Nombre
-            <input
-              className="input"
-              id="profile-name"
-              value={formData.name}
-              onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
-            />
-          </label>
+        <div className="flex items-center gap-4 rounded-[1.15rem] bg-[rgba(255,255,255,0.42)] p-4">
+          {user?.image ? (
+            <img
+              alt={userLabel}
+              className="h-16 w-16 rounded-full border border-[rgba(109,78,52,0.2)] object-cover"
+              src={user.image}
+              onError={(event) => {
+                event.currentTarget.style.display = 'none'
+                const fallback = event.currentTarget.nextElementSibling
 
+                if (fallback) {
+                  fallback.classList.remove('hidden')
+                }
+              }}
+            />
+          ) : null}
+
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(109,78,52,0.16)] text-xl font-semibold text-[--wood-dark] ${user?.image ? 'hidden' : ''}`}
+          >
+            {userLabel.charAt(0).toUpperCase()}
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[--muted]">Tu perfil</p>
+            <p className="mt-1 text-lg font-semibold text-[--ink]">{userLabel}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <label className="label" htmlFor="profile-email">
             Correo
             <input
@@ -557,6 +619,18 @@ function ProfilePage() {
               type="email"
               value={formData.email}
               onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
+            />
+          </label>
+
+          <label className="label" htmlFor="profile-password">
+            Nueva contraseña
+            <input
+              className="input"
+              id="profile-password"
+              type="password"
+              value={formData.password}
+              onChange={(event) => setFormData((current) => ({ ...current, password: event.target.value }))}
+              placeholder="Déjala vacía para no cambiarla"
             />
           </label>
         </div>
@@ -585,6 +659,7 @@ function DashboardPage({ mode }) {
   const [loading, setLoading] = useState(true)
   const [previewMode, setPreviewMode] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const productFormRef = useRef(null)
   const [savingProduct, setSavingProduct] = useState(false)
   const [savingUserId, setSavingUserId] = useState('')
   const [status, setStatus] = useState({ tone: 'info', message: '' })
@@ -592,7 +667,7 @@ function DashboardPage({ mode }) {
   useEffect(() => {
     let ignore = false
 
-    Promise.allSettled([getProducts(), mode === 'admin' ? getUsers(token) : Promise.resolve([])])
+    Promise.allSettled([getProducts(token), mode === 'admin' ? getUsers(token) : Promise.resolve([])])
       .then(([productsResult, usersResult]) => {
         if (ignore) {
           return
@@ -612,6 +687,22 @@ function DashboardPage({ mode }) {
       ignore = true
     }
   }, [mode, token])
+
+  const resolveProductApiErrorMessage = (error, actionLabel = 'guardar') => {
+    if (error?.status === 403) {
+      return 'No tienes permisos para gestionar productos. Esta acción requiere rol admin.'
+    }
+
+    if (error?.status === 404) {
+      return `La ruta de API para ${actionLabel} productos no existe o no está publicada.`
+    }
+
+    if (error?.status === 401) {
+      return 'Tu sesión no es válida o ha caducado. Inicia sesión de nuevo.'
+    }
+
+    return error?.message || 'No se pudo completar la operación con la API.'
+  }
 
   const handleProductSubmit = async (formValues) => {
     setSavingProduct(true)
@@ -654,7 +745,9 @@ function DashboardPage({ mode }) {
         return
       }
 
-      throw error
+      throw new Error(
+        resolveProductApiErrorMessage(error, editingProduct ? 'actualizar' : 'crear'),
+      )
     } finally {
       setSavingProduct(false)
     }
@@ -678,8 +771,17 @@ function DashboardPage({ mode }) {
         return
       }
 
-      setStatus({ tone: 'error', message: error.message })
+      setStatus({ tone: 'error', message: resolveProductApiErrorMessage(error, 'eliminar') })
     }
+  }
+
+  const handleStartEditingProduct = (product) => {
+    setEditingProduct(product)
+    setStatus({ tone: 'info', message: `Editando: ${product.name}` })
+
+    requestAnimationFrame(() => {
+      productFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   const handleRoleChange = async (userId, role) => {
@@ -706,11 +808,7 @@ function DashboardPage({ mode }) {
       <PageHeader
         badge={mode === 'admin' ? 'Panel admin' : 'Panel editor'}
         title={mode === 'admin' ? 'Administración completa de la vinacoteca' : 'Gestión del catálogo'}
-        description={
-          mode === 'admin'
-            ? 'Incluye CRUD de productos y gestión de usuarios/roles, listo para los endpoints protegidos por admin.'
-            : 'Permite crear, editar y borrar vinos o cervezas desde la interfaz con control de permisos.'
-        }
+        description={mode === 'admin' ? 'Gestiona productos y roles.' : 'Gestiona productos.'}
       />
 
       {previewMode ? (
@@ -725,13 +823,15 @@ function DashboardPage({ mode }) {
         <div className="panel text-sm text-[--muted]">Cargando dashboard...</div>
       ) : (
         <>
-          <ProductForm
-            key={editingProduct?.id || 'new-product'}
-            editingProduct={editingProduct}
-            onCancel={() => setEditingProduct(null)}
-            onSubmit={handleProductSubmit}
-            saving={savingProduct}
-          />
+          <div ref={productFormRef}>
+            <ProductForm
+              key={editingProduct?.id || 'new-product'}
+              editingProduct={editingProduct}
+              onCancel={() => setEditingProduct(null)}
+              onSubmit={handleProductSubmit}
+              saving={savingProduct}
+            />
+          </div>
 
           <section className="panel space-y-4">
             <div>
@@ -759,7 +859,7 @@ function DashboardPage({ mode }) {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <button className="btn-secondary" onClick={() => setEditingProduct(product)} type="button">
+                    <button className="btn-secondary" onClick={() => handleStartEditingProduct(product)} type="button">
                       Editar
                     </button>
                     <button className="btn-danger" onClick={() => handleDeleteProduct(product)} type="button">
@@ -786,7 +886,7 @@ function NotFoundPage() {
       <PageHeader
         badge="Ruta no encontrada"
         title="Esta página no existe"
-        description="El frontend ya controla el estado 404 del lado cliente para que la navegación no se rompa."
+        description=""
         actions={<Link className="btn-secondary" to="/">Volver al inicio</Link>}
       />
     </div>
