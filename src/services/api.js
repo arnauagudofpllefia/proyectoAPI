@@ -304,8 +304,6 @@ export async function register(data) {
 
   if (data.photo) {
     formData.append('imatge', data.photo)
-    formData.append('foto', data.photo)
-    formData.append('image', data.photo)
   }
 
   const payload = await requestWithFallback(
